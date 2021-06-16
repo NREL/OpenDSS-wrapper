@@ -6,3 +6,5 @@ build/
 dist/
 *.egg-info/
 src/
+
+examples/battery_results.csv

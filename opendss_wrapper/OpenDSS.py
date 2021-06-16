@@ -2,8 +2,6 @@ import opendssdirect as dss
 import numpy as np
 import pandas as pd
 
-# Author: Michael Blonsky
-
 ELEMENT_CLASSES = {
     'Load': dss.Loads,
     'PV': dss.PVsystems,

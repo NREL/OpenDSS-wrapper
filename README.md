@@ -1,5 +1,5 @@
 # OpenDSS-wrapper
-Distribution system simulation python wrapper to connect OpenDSSDirect.py with a co-simulation
+Distribution system simulation python wrapper to connect OpenDSSDirect.py with a co-simulation framework
 
 The wrapper contains user-friendly functions for various OpenDSS commands:
 * Getting and setting power
@@ -18,18 +18,18 @@ project and include the following lines:
 ```
 dependencies:
   - pip:
-    - --editable=git+https://github.nrel.gov/SETO-foresee/OpenDSS-wrapper
-```
-
-For a particular branch (or version), change the last line to:
-
-```
-    - --editable=git+https://github.nrel.gov/SETO-foresee/OpenDSS-wrapper@<branch-name>
+    - git+https://github.com/NREL/OpenDSS-wrapper
 ```
 
 ### Stand-alone Installation
 
-For a stand-alone installation, run the `setup.py` file from the command line:
+For a stand-alone installation, run:
+
+```
+pip install git+https://github.com/NREL/OpenDSS-wrapper
+```
+
+Or, download the repository and run the `setup.py` file from the command line:
 
 ```
 python setup.py install
@@ -38,12 +38,22 @@ python setup.py install
 ## Usage
 
 The OpenDSS wrapper makes it easy to call OpenDSS commands without knowing any details about
-OpenDSS syntax. Some sample commands are provided below.
+OpenDSS syntax. Some sample commands and usage are provided in the `examples` folder.
 
 Note: The wrapper assumes a standard sign notation that is different than OpenDSS.
 All powers (including for PV, loads, and batteries) use the sign notation:
 
-* Positive = Consuming power (battery charging)
-* Negative = Generating power (battery discharging)
+* Positive = Consuming power (e.g. battery charging)
+* Negative = Generating power (e.g. battery discharging)
 
-### 
+For details on OpenDSSDirect.py, see:
+
+https://dss-extensions.org/OpenDSSDirect.py/
+
+## License
+
+Distributed under the BSD 3-Clause License. See `LICENSE` for more information.
+
+## Contact
+
+Michael Blonsky - <Michael.Blonsky@nrel.gov>

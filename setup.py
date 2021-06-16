@@ -36,10 +36,10 @@ def find_version(*file_paths):
 
 setup(name='OpenDSS-wrapper',
       version=find_version('opendss_wrapper', '__init__.py'),
-      description='Distribution system simulation python wrapper to connect OpenDSSDirect.py with a co-simulation',
+      description='Distribution system simulation python wrapper to connect OpenDSSDirect.py with a co-simulation framework',
       author='Michael Blonsky',
       author_email='Michael.Blonsky@nrel.gov',
-      url='https://github.nrel.gov/SETO-foresee/OpenDSS-wrapper',
+      url='https://github.com/NREL/OpenDSS-wrapper',
       packages=find_packages(),
       install_requires=requirements,
       package_data={'opendss_wrapper': []},
