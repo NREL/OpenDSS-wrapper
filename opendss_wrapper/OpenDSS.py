@@ -54,17 +54,17 @@ class OpenDSS:
         self.run_dss()
         dss.Solution.StepSize(time_step.total_seconds())
 
-        print('DSS Compiled Circuit:', dss.Circuit.Name())
+        print(f'DSS Compiled Circuit: {dss.Circuit.Name()}')
 
     @staticmethod
     def run_command(cmd):
         status = dss.run_command(cmd)
         if status:
-            print('DSS Status ({}): {}'.format(cmd, status))
+            print(f'DSS Status ({cmd}): {status}')
 
     def redirect(self, filename):
-        print('DSS Running file:', filename)
-        self.run_command('Redirect ' + filename)
+        print(f'DSS Running file: {filename}')
+        self.run_command(f'Redirect "{filename}"')
 
     def run_dss(self, no_controls=False):
         try:
@@ -73,7 +73,7 @@ class OpenDSS:
             else:
                 status = dss.Solution.Solve()
             if status:
-                print('DSS Solve Status: {}'.format(status))
+                print(f'DSS Solve Status: {status}')
 
             if self.includes_elements['Storage']:
                 dss.Circuit.UpdateStorage()
@@ -99,7 +99,7 @@ class OpenDSS:
         return df
 
     @staticmethod
-    def get_circuit_power():
+    def get_circuit_power(total=True):
         # returns negative of circuit power (positive = consuming power)
         powers = dss.Circuit.TotalPower()
         if len(powers) == 2:
@@ -111,8 +111,12 @@ class OpenDSS:
         else:
             raise OpenDSSException('Expected 1- or 3-phase circuit')
         if np.isnan(p) or np.isnan(q):
-            raise OpenDSSException('NaN output for circuit power: ({}, {})'.format(p, q))
-        return p, q
+            raise OpenDSSException(f'NaN output for circuit power: ({p}, {q})')
+
+        if total and isinstance(p, list):
+            return sum(p), sum(q)
+        else:
+            return p, q
 
     @staticmethod
     def get_losses():
@@ -149,13 +153,13 @@ class OpenDSS:
                'Total Loss P (MW)': p_loss / 1000,
                }
         for class_name, (p, q) in total_by_class.items():
-            out['Total {} P (MW)'.format(class_name)] = p / 1000
+            out[f'Total {class_name} P (MW)'] = p / 1000
 
         out.update({'Total Q (MVAR)': q_total / 1000,
                     'Total Loss Q (MVAR)': q_loss / 1000,
                     })
         for class_name, (p, q) in total_by_class.items():
-            out['Total {} Q (MVAR)'.format(class_name)] = q / 1000
+            out[f'Total {class_name} Q (MVAR)'] = q / 1000
 
         return out
 
@@ -171,7 +175,7 @@ class OpenDSS:
             else:
                 v = dss.Bus.VMagAngle()
             if any([x <= 0 for x in v[::2]]):
-                raise OpenDSSException('Bus "{}" voltage = {}, out of bounds'.format(bus, v))
+                raise OpenDSSException(f'Bus "{bus}" voltage = {v}, out of bounds')
         else:
             if pu:
                 v = dss.Bus.PuVoltage()
@@ -184,7 +188,7 @@ class OpenDSS:
         elif phase - 1 in range(len(v) // 2):
             v = v[2 * (phase - 1): 2 * phase]
         else:
-            raise OpenDSSException('Bad phase for Bus {}: {}'.format(bus, phase))
+            raise OpenDSSException(f'Bad phase for Bus {bus}: {phase}')
 
         # Remove angles if voltages in polar coordinates
         if polar and mag_only:
@@ -192,7 +196,7 @@ class OpenDSS:
 
         # return a float if only returning 1 voltage, otherwise return a tuple
         if any([np.isnan(x) for x in v]):
-            raise OpenDSSException('NaN output for bus voltage: {}'.format(bus))
+            raise OpenDSSException(f'NaN output for bus voltage: {bus}')
 
         if len(v) == 1:
             return v[0]
@@ -214,7 +218,7 @@ class OpenDSS:
         cls.Name(name)
 
         if cls.Name() != name:
-            raise OpenDSSException('{} "{}" does not exist'.format(element, name))
+            raise OpenDSSException(f'{element} "{name}" does not exist')
 
     def get_voltage(self, name, element='Load', **kwargs):
         # note: for lines/transformers, always takes voltage from Bus1
@@ -277,7 +281,7 @@ class OpenDSS:
                 powers = powers[(phase - 1) * 2: phase * 2]
                 return tuple(powers)
         else:
-            raise OpenDSSException('Bad phase for {} {}: {}'.format(element, name, phase))
+            raise OpenDSSException(f'Bad phase for {element} {name}: {phase}')
 
     def set_power(self, name, p=None, q=None, element='Load', size=None):
         if element in ELEMENT_CLASSES:
@@ -289,7 +293,7 @@ class OpenDSS:
                 cls.kvar(q)
         elif element == 'Storage':
             if p == 0:
-                self.run_command('edit {}.{} kW=0 kvar=0 State=Idling'.format(element, name))
+                self.run_command(f'edit {element}.{name} kW=0 kvar=0 State=Idling')
                 return
 
             if size is None:
@@ -304,9 +308,9 @@ class OpenDSS:
 
             if p < 0:
                 self.run_command(
-                    'edit {}.{} %discharge={:.4} pf={:.4} State=Discharging'.format(element, name, p_pct, pf))
+                    f'edit {element}.{name} %discharge={p_pct:.4} pf={pf:.4} State=Discharging')
             else:
-                self.run_command('edit {}.{} %charge={:.4} pf={:.4} State=Charging'.format(element, name, p_pct, pf))
+                self.run_command(f'edit {element}.{name} %charge={p_pct:.4} pf={pf:.4} State=Charging')
         else:
             raise OpenDSSException("Unknown element class:", element)
 
@@ -326,7 +330,7 @@ class OpenDSS:
         self.set_element(name, element)
         all_properties = dss.Element.AllPropertyNames()
         if property_name not in all_properties:
-            raise OpenDSSException('Could not find {} property for {} "{}"'.format(property_name, element, name))
+            raise OpenDSSException(f'Could not find {property_name} property for {element} "{name}"')
 
         idx = all_properties.index(property_name)
         value = dss.Properties.Value(str(idx + 1))
@@ -341,7 +345,7 @@ class OpenDSS:
         self.set_element(name, element)
         all_properties = dss.Element.AllPropertyNames()
         if property_name not in all_properties:
-            raise OpenDSSException('Could not find {} property for {} "{}"'.format(property_name, element, name))
+            raise OpenDSSException(f'Could not find {property_name} property for {element} "{name}"')
 
         idx = all_properties.index(property_name)
         dss.Properties.Value(str(idx + 1), str(value))

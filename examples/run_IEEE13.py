@@ -24,14 +24,16 @@ start_time = dt.datetime(2019, 1, 1)
 d = OpenDSS(master_dss_file, time_res, start_time)
 
 # Run 1 timestep
-print('run output:', d.run_dss())
+print()
+print('Running 1 time step...')
+d.run_dss()
 print()
 
 # Check circuit functions
 print('Circuit info:')
 info = d.get_circuit_info()
 for key, val in info.items():
-    print(key, '->', val)
+    print(f'{key:20} -> {val:11.8f}')
 print()
 
 # All Element Names
