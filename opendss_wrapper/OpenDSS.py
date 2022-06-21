@@ -8,8 +8,11 @@ ELEMENT_CLASSES = {
     'Generator': dss.Generators,
     'Line': dss.Lines,
     'Xfmr': dss.Transformers,
+    'Capacitor': dss.Capacitors,
+    'RegControl': dss.RegControls,  # Tap changer
+    'CapControl': dss.CapControls,  # Capacitor control
 }
-LINE_CLASSES = ['Line', 'Xfmr']
+LINE_CLASSES = ['Line', 'Xfmr', 'Capacitor']
 
 
 class OpenDSSException(Exception):
@@ -182,29 +185,34 @@ class OpenDSS:
             else:
                 v = dss.Bus.Voltages()
 
-        # if phase selected, only keep voltages from given phase
-        if phase is None:
-            pass
-        elif phase - 1 in range(len(v) // 2):
-            v = v[2 * (phase - 1): 2 * phase]
-        else:
-            raise OpenDSSException(f'Bad phase for Bus {bus}: {phase}')
-
-        # Remove angles if voltages in polar coordinates
-        if polar and mag_only:
-            v = v[::2]
-
-        # return a float if only returning 1 voltage, otherwise return a tuple
         if any([np.isnan(x) for x in v]):
             raise OpenDSSException(f'NaN output for bus voltage: {bus}')
 
-        if len(v) == 1:
-            return v[0]
-        else:
-            if average:
-                return sum(v) / len(v)
+        n_phases = dss.Bus.NumNodes()
+        assert len(v) // 2 == n_phases
+        real_or_mag = tuple(v[0:2 * n_phases:2])  # real or magnitude
+        imag_or_ang = tuple(v[1:2 * n_phases + 1:2])  # imaginary or angle
+
+        # if phase selected, only keep voltages from given phase
+        if n_phases == 1:
+            if polar and mag_only:
+                return real_or_mag[0]
             else:
-                return tuple(v)
+                return real_or_mag[0], imag_or_ang[0]
+        elif phase is None:
+            if polar and mag_only and average:
+                return sum(real_or_mag) / len(real_or_mag)
+            elif polar and mag_only:
+                return real_or_mag
+            else:
+                return real_or_mag, imag_or_ang
+        elif phase - 1 in range(n_phases):
+            if polar and mag_only:
+                return real_or_mag[phase - 1]
+            else:
+                return real_or_mag[phase - 1], imag_or_ang[phase - 1]
+        else:
+            raise OpenDSSException(f'Bad phase for {n_phases}-phase Bus {bus}: {phase}')
 
     @staticmethod
     def set_element(name, element):
@@ -280,8 +288,10 @@ class OpenDSS:
             if phase - 1 in range(n_phases):
                 powers = powers[(phase - 1) * 2: phase * 2]
                 return tuple(powers)
+            else:
+                raise OpenDSSException(f'Unknown phase for {element} {name}: {phase}')
         else:
-            raise OpenDSSException(f'Bad phase for {element} {name}: {phase}')
+            raise OpenDSSException(f'Cannot parse powers for {element} {name}, num phases={n_phases}')
 
     def set_power(self, name, p=None, q=None, element='Load', size=None):
         if element in ELEMENT_CLASSES:
@@ -314,6 +324,55 @@ class OpenDSS:
         else:
             raise OpenDSSException("Unknown element class:", element)
 
+    def get_current(self, name, element='Load', polar=True, mag_only=True, line_bus=1, phase=None, total=False,
+                    raw=False):
+        # By default, returns current magnitudes for each phase (scalar for 1-phase, tuple for 3 phase). Options:
+        #  - If mag_only=False, returns tuple of (magnitude, angle)
+        #  - If polar=False, returns tuple of (real, imag)
+        #  - If line_bus=2: returns currents for 2nd bus for lines and transformers
+        #  - If phase is set (1, 2 or 3), only returns a scalar/tuple for that phase. Default is a tuple of all phases
+        #  - If total=True, retuns a sum of all current magnitudes (only if polar & mag_only & phase=None)
+        #  - If raw==True: returns raw data from dss.CktElement.CurrentsMagAng or dss.CktElement.Currents
+        self.set_element(name, element)
+        if polar:
+            currents = dss.CktElement.CurrentsMagAng()
+        else:
+            currents = dss.CktElement.Currents()
+        if raw:
+            return tuple(currents)
+
+        n_phases = dss.CktElement.NumPhases()
+        if element in LINE_CLASSES:
+            # remove zeros and second bus
+            start = (line_bus - 1) * len(currents) // 2
+            currents = currents[start: start + 2 * n_phases]
+        else:
+            # remove trailing zeros, if necessary
+            currents = currents[:2 * n_phases]
+        real_or_mag = tuple(currents[0:2 * n_phases:2])  # real or magnitude
+        imag_or_ang = tuple(currents[1:2 * n_phases + 1:2])  # imaginary or angle
+
+        if n_phases == 1:
+            if polar and mag_only:
+                return real_or_mag[0]
+            else:
+                return real_or_mag[0], imag_or_ang[0]
+        elif n_phases in [2, 3]:
+            if phase is None:
+                if polar and mag_only:
+                    if total:
+                        return sum(real_or_mag)
+                    else:
+                        return real_or_mag
+                else:
+                    return real_or_mag, imag_or_ang
+            if phase - 1 in range(n_phases):
+                return real_or_mag[phase - 1], imag_or_ang[phase - 1]
+            else:
+                raise OpenDSSException(f'Unknown phase for {element} {name}: {phase}')
+        else:
+            raise OpenDSSException(f'Cannot parse currents for {element} {name}, num phases={n_phases}')
+
     def get_all_complex(self, name, element='Load'):
         self.set_element(name, element)
         return {
@@ -326,9 +385,13 @@ class OpenDSS:
 
     # PROPERTY METHODS
 
-    def get_property(self, name, property_name, element='Load'):
+    def get_all_properties(self, name, element='Load'):
         self.set_element(name, element)
         all_properties = dss.Element.AllPropertyNames()
+        return all_properties
+
+    def get_property(self, name, property_name, element='Load'):
+        all_properties = self.get_all_properties(name, element)
         if property_name not in all_properties:
             raise OpenDSSException(f'Could not find {property_name} property for {element} "{name}"')
 
@@ -356,13 +419,36 @@ class OpenDSS:
     def remove_loadshape(self, name, element='Load'):
         self.set_property(name, 'yearly', 'constant', element)
 
-    @staticmethod
-    def set_tap(name, tap, max_tap=16):
-        dss.RegControls.Name(name)
-        tap = min(max(int(tap), -max_tap), max_tap)
+    def set_is_open(self, name, open=True, element='Load', term=0, phase=0):
+        # term = dss.PDElements.FromTerminal()
+        # phase = int(dss.CktElement.BusNames()[1].split(".")[1])
+        self.set_element(name, element)
+        if open:
+            dss.CktElement.Open(term, phase)
+        else:
+            dss.CktElement.Close(term, phase)
+
+    def get_is_open(self, name, element='Load', term=0, phase=0):
+        # term = dss.PDElements.FromTerminal()
+        # phase = int(dss.CktElement.BusNames()[1].split(".")[1])
+        self.set_element(name, element)
+        is_open = bool(dss.CktElement.IsOpen(term, phase))
+        return is_open
+
+    def set_tap(self, name, tap, max_tap=16):
+        self.set_element(name, 'RegControl')
+        tap = int(min(max(tap, -max_tap), max_tap))
         dss.RegControls.TapNumber(tap)
 
-    @staticmethod
-    def get_tap(name):
-        dss.RegControls.Name(name)
+    def get_tap(self, name):
+        self.set_element(name, 'RegControl')
         return int(dss.RegControls.TapNumber())
+
+    def set_pt_ratio(self, name, pt_ratio):
+        self.set_element(name, 'CapControl')
+        dss.CapControls.PTRatio(pt_ratio)
+
+    def get_pt_ratio(self, name):
+        self.set_element(name, 'CapControl')
+        return float(dss.CapControls.PTRatio())
+
