@@ -228,10 +228,12 @@ class OpenDSS:
         if cls.Name() != name:
             raise OpenDSSException(f'{element} "{name}" does not exist')
 
-    def get_voltage(self, name, element='Load', **kwargs):
+    def get_voltage(self, name, element='Load', line_bus=1, **kwargs):
         # note: for lines/transformers, always takes voltage from Bus1
         self.set_element(name, element)
-        bus = dss.CktElement.BusNames()[0]
+        buses = dss.CktElement.BusNames()
+        assert len(buses) == 2 if element in LINE_CLASSES else 1
+        bus = buses[line_bus - 1 if element in LINE_CLASSES else 0]
         if dss.CktElement.NumPhases() == 1:
             kwargs['phase'] = 1
         return self.get_bus_voltage(bus, **kwargs)
