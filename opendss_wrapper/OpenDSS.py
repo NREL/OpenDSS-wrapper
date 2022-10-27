@@ -169,7 +169,7 @@ class OpenDSS:
     # VOLTAGE METHODS
 
     @staticmethod
-    def get_bus_voltage(bus, phase=None, pu=True, polar=True, mag_only=True, average=False):
+    def get_bus_voltage(bus, phase=None, pu=True, polar=True, mag_only=True, average=False, zero_voltage_error=False):
         dss.Circuit.SetActiveBus(bus)
 
         if polar:
@@ -177,8 +177,6 @@ class OpenDSS:
                 v = dss.Bus.puVmagAngle()
             else:
                 v = dss.Bus.VMagAngle()
-            if any([x <= 0 for x in v[::2]]):
-                raise OpenDSSException(f'Bus "{bus}" voltage = {v}, out of bounds')
         else:
             if pu:
                 v = dss.Bus.PuVoltage()
@@ -192,6 +190,10 @@ class OpenDSS:
         assert len(v) // 2 == n_phases
         real_or_mag = tuple(v[0:2 * n_phases:2])  # real or magnitude
         imag_or_ang = tuple(v[1:2 * n_phases + 1:2])  # imaginary or angle
+
+        if polar and zero_voltage_error and any([mag <= 1e-10 for mag in real_or_mag]):
+            raise OpenDSSException(f'Bus "{bus}" voltage is out of bounds: {real_or_mag}')
+
 
         # if phase selected, only keep voltages from given phase
         if n_phases == 1:

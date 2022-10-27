@@ -1,12 +1,14 @@
 import os
 import datetime as dt
 import pandas as pd
+from pyparsing import ZeroOrMore
 
 from opendss_wrapper import OpenDSS
 
-pd.set_option('max_columns', None)  # Prints all columns
+pd.set_option('display.precision', 3)      # precision in print statements
 pd.set_option('expand_frame_repr', False)  # Keeps results on 1 line
-pd.set_option('precision', 3)
+pd.set_option('display.max_rows', 30)      # Shows up to 30 rows of data
+# pd.set_option('max_columns', None)       # Prints all columns
 
 """
 Script to test the IEEE13 test feeder
@@ -42,12 +44,12 @@ print()
 
 # Get bus voltages
 buses = feeder.get_all_buses()
-bus0 = buses[0]
+last_bus = buses[-1]
 print('All Bus names:', buses)
-print('First Bus voltage:', feeder.get_bus_voltage(bus0))
-print('First Bus voltage, phase 1:', feeder.get_bus_voltage(bus0, phase=1))
-print('First Bus voltage, complex:', feeder.get_bus_voltage(bus0, polar=False, pu=False))
-print('First Bus voltage, MagAng:', feeder.get_bus_voltage(bus0, mag_only=False))
+print('Last Bus voltage:', feeder.get_bus_voltage(last_bus))
+print('Last Bus voltage, phase 1:', feeder.get_bus_voltage(last_bus, phase=1))
+print('Last Bus voltage, complex:', feeder.get_bus_voltage(last_bus, polar=False, pu=False))
+print('Last Bus voltage, magnitudes and angles:', feeder.get_bus_voltage(last_bus, mag_only=False, pu=False))
 print()
 
 # Get all loads, as dataframe
@@ -107,3 +109,14 @@ reg0 = feeder.get_all_elements('RegControl').index[0]
 print(f'First Voltage Regulator Tap:', feeder.get_tap(reg0))
 feeder.set_tap(reg0, 10)
 print(f'First Voltage Regulator Tap:', feeder.get_tap(reg0))
+print()
+
+# Get bus voltage after Xfmr is opened
+print('Last Bus voltage (before running):', feeder.get_bus_voltage(last_bus))
+print('Running 1 time step...')
+feeder.run_dss()
+print('Last Bus voltage (after running):', feeder.get_bus_voltage(last_bus))
+print('Last Bus voltage:', feeder.get_bus_voltage(last_bus, polar=False))
+print()
+
+
