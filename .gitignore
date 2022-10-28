@@ -1,6 +1,7 @@
 *.pyc
 .DS_Store
 
+.vscode/
 .idea/
 build/
 dist/
