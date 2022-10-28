@@ -4,9 +4,10 @@ import pandas as pd
 
 from opendss_wrapper import OpenDSS
 
-pd.set_option('max_columns', None)  # Prints all columns
+pd.set_option('display.precision', 3)      # precision in print statements
 pd.set_option('expand_frame_repr', False)  # Keeps results on 1 line
-pd.set_option('precision', 3)
+pd.set_option('display.max_rows', 30)      # Shows up to 30 rows of data
+# pd.set_option('max_columns', None)       # Prints all columns
 
 """
 Script to test a battery on the IEEE13 test feeder
