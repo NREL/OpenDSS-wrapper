@@ -1,4 +1,5 @@
 import opendssdirect as dss
+import datetime as dt
 import numpy as np
 import pandas as pd
 
@@ -14,17 +15,26 @@ ELEMENT_CLASSES = {
 }
 LINE_CLASSES = ['Line', 'Xfmr', 'Capacitor']
 
+STATUS_ERRORS = [
+    'Error',
+    'Unknown',
+    'not found',
+]
+
 
 class OpenDSSException(Exception):
     pass
 
 
 class OpenDSS:
-    def __init__(self, redirects, time_step, start_time, **kwargs):
+    name = 'DSS'
+
+    def __init__(self, redirects, time_step, start_time, fail_on_error=True, **kwargs):
         self.dss = dss
+        self.fail_on_error = fail_on_error
 
         # Run redirect files before main dss file
-        print('DSS Compiling...')
+        self.print('Compiling...')
         if not isinstance(redirects, list):
             redirects = [redirects]
         for redirect in redirects:
@@ -57,16 +67,18 @@ class OpenDSS:
         self.run_dss()
         dss.Solution.StepSize(time_step.total_seconds())
 
-        print(f'DSS Compiled Circuit: {dss.Circuit.Name()}')
+        self.print(f'Compiled Circuit: {dss.Circuit.Name()}')
 
-    @staticmethod
-    def run_command(cmd):
+    def run_command(self, cmd):
         status = dss.run_command(cmd)
         if status:
-            print(f'DSS Status ({cmd}): {status}')
+            if any([error in status for error in STATUS_ERRORS]):
+                self.fail(f'Status ({cmd}): {status}')
+            else:
+                self.print(f'Status ({cmd}): {status}')
 
     def redirect(self, filename):
-        print(f'DSS Running file: {filename}')
+        self.print(f'Running file: {filename}')
         self.run_command(f'Redirect "{filename}"')
 
     def run_dss(self, no_controls=False):
@@ -76,7 +88,10 @@ class OpenDSS:
             else:
                 status = dss.Solution.Solve()
             if status:
-                print(f'DSS Solve Status: {status}')
+                if any([error in status for error in STATUS_ERRORS]):
+                    self.fail(f'Solve Status: {status}')
+                else:
+                    self.print(f'Solve Status: {status}')
 
             if self.includes_elements['Storage']:
                 dss.Circuit.UpdateStorage()
@@ -101,8 +116,7 @@ class OpenDSS:
             # df = dss.utils.class_to_dataframe(element)
         return df
 
-    @staticmethod
-    def get_circuit_power(total=True):
+    def get_circuit_power(self, total=True):
         # returns negative of circuit power (positive = consuming power)
         powers = dss.Circuit.TotalPower()
         if len(powers) == 2:
@@ -114,7 +128,7 @@ class OpenDSS:
         else:
             raise OpenDSSException('Expected 1- or 3-phase circuit')
         if np.isnan(p) or np.isnan(q):
-            raise OpenDSSException(f'NaN output for circuit power: ({p}, {q})')
+            self.fail(f'NaN output for circuit power: ({p}, {q})')
 
         if total and isinstance(p, list):
             return sum(p), sum(q)
@@ -168,8 +182,8 @@ class OpenDSS:
 
     # VOLTAGE METHODS
 
-    @staticmethod
-    def get_bus_voltage(bus, phase=None, pu=True, polar=True, mag_only=True, average=False, zero_voltage_error=False):
+    def get_bus_voltage(self, bus, phase=None, pu=True, polar=True, mag_only=True, average=False,
+                        zero_voltage_error=False):
         dss.Circuit.SetActiveBus(bus)
 
         if polar:
@@ -184,7 +198,7 @@ class OpenDSS:
                 v = dss.Bus.Voltages()
 
         if any([np.isnan(x) for x in v]):
-            raise OpenDSSException(f'NaN output for bus voltage: {bus}')
+            self.fail(f'NaN output for bus voltage: {bus}')
 
         n_phases = dss.Bus.NumNodes()
         assert len(v) // 2 == n_phases
@@ -192,7 +206,7 @@ class OpenDSS:
         imag_or_ang = tuple(v[1:2 * n_phases + 1:2])  # imaginary or angle
 
         if polar and zero_voltage_error and any([mag <= 1e-10 for mag in real_or_mag]):
-            raise OpenDSSException(f'Bus "{bus}" voltage is out of bounds: {real_or_mag}')
+            self.fail(f'Bus "{bus}" voltage is out of bounds: {real_or_mag}')
 
 
         # if phase selected, only keep voltages from given phase
@@ -456,3 +470,11 @@ class OpenDSS:
         self.set_element(name, 'CapControl')
         return float(dss.CapControls.PTRatio())
 
+    def print(self, *msg):
+        print(f'{dt.datetime.now()} - {self.name}:', *msg)
+
+    def fail(self, *msg):
+        if self.fail_on_error:
+            raise OpenDSSException(*msg)
+        else:
+            self.print(*msg)

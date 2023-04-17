@@ -1,3 +1,3 @@
-from .OpenDSS import OpenDSS, OpenDSSException
+from .OpenDSS import OpenDSS
 
-__version__ = '1.5'
+__version__ = '1.6'

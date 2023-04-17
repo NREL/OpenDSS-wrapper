@@ -118,5 +118,3 @@ feeder.run_dss()
 print('Last Bus voltage (after running):', feeder.get_bus_voltage(last_bus))
 print('Last Bus voltage:', feeder.get_bus_voltage(last_bus, polar=False))
 print()
-
-
