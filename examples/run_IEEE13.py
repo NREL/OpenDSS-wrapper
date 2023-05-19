@@ -96,6 +96,7 @@ print('First Xfmr voltages (low bus, in V):', feeder.get_voltage(xfmr0, element=
 print('First Xfmr is open:', feeder.get_is_open(xfmr0, element='Xfmr'))
 feeder.set_is_open(xfmr0, True, element='Xfmr')
 print('First Xfmr is open:', feeder.get_is_open(xfmr0, element='Xfmr'))
+feeder.set_is_open(xfmr0, False, element='Xfmr')
 print()
 
 # Get capacitor info
