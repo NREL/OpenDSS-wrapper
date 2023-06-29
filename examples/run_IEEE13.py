@@ -98,6 +98,15 @@ print('First Xfmr is open:', feeder.get_is_open(xfmr0, element='Xfmr'))
 feeder.set_is_open(xfmr0, False, element='Xfmr')
 print()
 
+# Set circuit voltage and verify change in load voltage
+voltage, angle = feeder.get_circuit_voltage()
+print('Circuit voltage magnitude and angle:', (voltage, angle))
+feeder.set_circuit_voltage(1.05, 90)
+feeder.run_dss()
+print('Circuit voltage after update:', feeder.get_circuit_voltage())
+print('First Xfmr voltages after update (high bus, in V):', feeder.get_voltage(xfmr0, element='Xfmr', pu=False))
+feeder.set_circuit_voltage(voltage, angle)
+
 # Get capacitor info
 cap0 = feeder.get_all_elements('Capacitor').index[0]
 states = feeder.get_property(cap0, 'states', element='Capacitor')
