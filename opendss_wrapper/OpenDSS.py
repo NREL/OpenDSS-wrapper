@@ -116,6 +116,34 @@ class OpenDSS:
             # df = dss.utils.class_to_dataframe(element)
         return df
 
+    def get_circuit_voltage(self, pu=True):
+        # gets circuit voltage magnitude and angle, returns a tuple of (magnitude, angle)
+        # if pu is True, magnitude unit is p.u., otherwise unit is kV
+        # angle unit is degrees, corresponds to the angle of the 1st phase
+        assert dss.Vsources.Count() == 1
+        
+        voltage = dss.Vsources.PU()
+        if not pu:
+            voltage *= dss.Vsources.BasekV()
+
+        angle = dss.Vsources.AngleDeg()
+
+        return voltage, angle
+
+    def set_circuit_voltage(self, voltage, angle=None, pu=True):
+        # sets the Vsource voltage magnitude and angle
+        # if pu is True, voltage unit is p.u., otherwise, unit is kV
+        # angle units are degrees. Corresponds to the angle of the 1st phase 
+        assert dss.Vsources.Count() == 1
+        
+        if not pu:
+            voltage /= dss.Vsources.BasekV()
+
+        dss.Vsources.PU(voltage)
+
+        if angle is not None:
+            dss.Vsources.AngleDeg(angle)
+
     def get_circuit_power(self, total=True):
         # returns negative of circuit power (positive = consuming power)
         powers = dss.Circuit.TotalPower()
